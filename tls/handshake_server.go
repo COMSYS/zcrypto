@@ -371,8 +371,8 @@ func (hs *serverHandshakeState) doFullHandshake() error {
 		// Request a client certificate
 		certReq := new(certificateRequestMsg)
 		certReq.certificateTypes = []byte{
-			byte(certTypeRSASign),
-			byte(certTypeECDSASign),
+			byte(CertTypeRSASign),
+			byte(CertTypeECDSASign),
 		}
 		if c.vers >= VersionTLS12 {
 			certReq.hasSignatureAndHash = true
@@ -490,15 +490,15 @@ func (hs *serverHandshakeState) doFullHandshake() error {
 			// algorithm was possible. Leave the hash as zero.
 			switch pub.(type) {
 			case *ecdsa.PublicKey:
-				signatureAndHash.Signature = signatureECDSA
+				signatureAndHash.Signature = SignatureECDSA
 			case *rsa.PublicKey:
-				signatureAndHash.Signature = signatureRSA
+				signatureAndHash.Signature = SignatureRSA
 			}
 		}
 
 		switch key := pub.(type) {
 		case *x509.AugmentedECDSA:
-			if signatureAndHash.Signature != signatureECDSA {
+			if signatureAndHash.Signature != SignatureECDSA {
 				err = errors.New("tls: bad signature type for client's ECDSA certificate")
 				break
 			}
@@ -520,7 +520,7 @@ func (hs *serverHandshakeState) doFullHandshake() error {
 				break
 			}
 		case *ecdsa.PublicKey:
-			if signatureAndHash.Signature != signatureECDSA {
+			if signatureAndHash.Signature != SignatureECDSA {
 				err = errors.New("tls: bad signature type for client's ECDSA certificate")
 				break
 			}
@@ -542,7 +542,7 @@ func (hs *serverHandshakeState) doFullHandshake() error {
 				break
 			}
 		case *rsa.PublicKey:
-			if signatureAndHash.Signature != signatureRSA {
+			if signatureAndHash.Signature != SignatureRSA {
 				err = errors.New("tls: bad signature type for client's RSA certificate")
 				break
 			}

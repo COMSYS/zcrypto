@@ -276,7 +276,7 @@ type cbcMode interface {
 // decrypt checks and strips the mac and decrypts the data in b. Returns a
 // success boolean, the number of bytes to skip from the start of the record in
 // order to get the application payload, and an optional alert value.
-func (hc *halfConn) decrypt(b *block) (ok bool, prefixLen int, alertValue alert) {
+func (hc *halfConn) decrypt(b *block) (ok bool, prefixLen int, alertValue Alert) {
 	recordHeaderLen := hc.recordHeaderLen()
 
 	// pull out payload
@@ -401,7 +401,7 @@ func padToBlockSize(payload []byte, blockSize int) (prefix, finalBlock []byte) {
 }
 
 // encrypt encrypts and macs the data in b.
-func (hc *halfConn) encrypt(b *block, explicitIVLen int) (bool, alert) {
+func (hc *halfConn) encrypt(b *block, explicitIVLen int) (bool, Alert) {
 	recordHeaderLen := hc.recordHeaderLen()
 
 	// mac
@@ -670,7 +670,7 @@ Again:
 			c.in.setErrorLocked(c.sendAlert(alertUnexpectedMessage))
 			break
 		}
-		if alert(data[1]) == alertCloseNotify {
+		if Alert(data[1]) == alertCloseNotify {
 			c.in.setErrorLocked(io.EOF)
 			break
 		}
@@ -680,7 +680,7 @@ Again:
 			c.in.freeBlock(b)
 			goto Again
 		case alertLevelError:
-			c.in.setErrorLocked(&net.OpError{Op: "remote error", Err: alert(data[1])})
+			c.in.setErrorLocked(&net.OpError{Op: "remote error", Err: Alert(data[1])})
 		default:
 			c.in.setErrorLocked(c.sendAlert(alertUnexpectedMessage))
 		}
@@ -692,7 +692,7 @@ Again:
 		}
 		err := c.in.changeCipherSpec()
 		if err != nil {
-			c.in.setErrorLocked(c.sendAlert(err.(alert)))
+			c.in.setErrorLocked(c.sendAlert(err.(Alert)))
 		}
 
 	case recordTypeApplicationData:
@@ -726,7 +726,7 @@ Again:
 
 // sendAlert sends a TLS alert message.
 // c.out.Mutex <= L.
-func (c *Conn) sendAlertLocked(err alert) error {
+func (c *Conn) sendAlertLocked(err Alert) error {
 	switch err {
 	case alertNoRenegotiation, alertCloseNotify:
 		c.tmp[0] = alertLevelWarning
@@ -744,7 +744,7 @@ func (c *Conn) sendAlertLocked(err alert) error {
 
 // sendAlert sends a TLS alert message.
 // L < c.out.Mutex.
-func (c *Conn) sendAlert(err alert) error {
+func (c *Conn) sendAlert(err Alert) error {
 	c.out.Lock()
 	defer c.out.Unlock()
 	return c.sendAlertLocked(err)
@@ -848,7 +848,7 @@ func (c *Conn) writeRecord(typ recordType, data []byte) (n int, err error) {
 			// Cannot call sendAlert directly,
 			// because we already hold c.out.Mutex.
 			c.tmp[0] = alertLevelError
-			c.tmp[1] = byte(err.(alert))
+			c.tmp[1] = byte(err.(Alert))
 			c.writeRecord(recordTypeAlert, c.tmp[0:2])
 			return n, c.out.setErrorLocked(&net.OpError{Op: "local error", Err: err})
 		}
@@ -1006,7 +1006,7 @@ func (c *Conn) Read(b []byte) (n int, err error) {
 			c.input = nil
 		}
 
-		// If a close-notify alert is waiting, read it so that
+		// If a close-notify Alert is waiting, read it so that
 		// we can return (n, EOF) instead of (n, nil), to signal
 		// to the HTTP response reading goroutine that the
 		// connection is now closed. This eliminates a race

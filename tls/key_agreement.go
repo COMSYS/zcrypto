@@ -268,23 +268,23 @@ func sha512Hash(slices [][]byte) []byte {
 func hashForServerKeyExchange(sigType, hashFunc uint8, version uint16, slices ...[]byte) ([]byte, crypto.Hash, error) {
 	if version >= VersionTLS12 {
 		switch hashFunc {
-		case hashSHA512:
+		case HashSHA512:
 			return sha512Hash(slices), crypto.SHA512, nil
-		case hashSHA384:
+		case HashSHA384:
 			return sha384Hash(slices), crypto.SHA384, nil
-		case hashSHA256:
+		case HashSHA256:
 			return sha256Hash(slices), crypto.SHA256, nil
-		case hashSHA224:
+		case HashSHA224:
 			return sha224Hash(slices), crypto.SHA224, nil
-		case hashSHA1:
+		case HashSHA1:
 			return sha1Hash(slices), crypto.SHA1, nil
-		case hashMD5:
+		case HashMD5:
 			return md5Hash(slices), crypto.MD5, nil
 		default:
 			return nil, crypto.Hash(0), errors.New("tls: unknown hash function used by peer")
 		}
 	}
-	if sigType == signatureECDSA || sigType == signatureDSA {
+	if sigType == SignatureECDSA || sigType == SignatureDSA {
 		return sha1Hash(slices), crypto.SHA1, nil
 	}
 	return md5SHA1Hash(slices), crypto.MD5SHA1, nil
@@ -298,7 +298,7 @@ func pickTLS12HashForSignature(sigType uint8, clientList, serverList []SigAndHas
 		// If the client didn't specify any signature_algorithms
 		// extension then we can assume that it supports SHA1. See
 		// http://tools.ietf.org/html/rfc5246#section-7.4.1.4.1
-		return hashSHA1, nil
+		return HashSHA1, nil
 	}
 
 	for _, sigAndHash := range clientList {
@@ -373,7 +373,7 @@ func (ka *signedKeyAgreement) signParameters(config *Config, cert *Certificate, 
 	}
 	var sig []byte
 	switch ka.sigType {
-	case signatureECDSA:
+	case SignatureECDSA:
 		privKey, ok := cert.PrivateKey.(*ecdsa.PrivateKey)
 		if !ok {
 			return nil, errors.New("ECDHE ECDSA requires an ECDSA server private key")
@@ -383,7 +383,7 @@ func (ka *signedKeyAgreement) signParameters(config *Config, cert *Certificate, 
 			return nil, errors.New("failed to sign ECDHE parameters: " + err.Error())
 		}
 		sig, err = asn1.Marshal(ecdsaSignature{r, s})
-	case signatureRSA:
+	case SignatureRSA:
 		privKey, ok := cert.PrivateKey.(*rsa.PrivateKey)
 		if !ok {
 			return nil, errors.New("ECDHE RSA requires a RSA server private key")
@@ -454,7 +454,7 @@ func (ka *signedKeyAgreement) verifyParameters(config *Config, clientHello *clie
 		return nil, err
 	}
 	switch ka.sigType {
-	case signatureECDSA:
+	case SignatureECDSA:
 		augECDSA, ok := cert.PublicKey.(*x509.AugmentedECDSA)
 		if !ok {
 			return nil, errors.New("ECDHE ECDSA: could not covert cert.PublicKey to x509.AugmentedECDSA")
@@ -470,7 +470,7 @@ func (ka *signedKeyAgreement) verifyParameters(config *Config, clientHello *clie
 		if !ecdsa.Verify(pubKey, digest, ecdsaSig.R, ecdsaSig.S) {
 			return nil, errors.New("ECDSA verification failure")
 		}
-	case signatureRSA:
+	case SignatureRSA:
 		pubKey, ok := cert.PublicKey.(*rsa.PublicKey)
 		if !ok {
 			return nil, errors.New("ECDHE RSA requires a RSA server public key")
@@ -478,7 +478,7 @@ func (ka *signedKeyAgreement) verifyParameters(config *Config, clientHello *clie
 		if err := rsa.VerifyPKCS1v15(pubKey, hashFunc, digest, sig); err != nil {
 			return nil, err
 		}
-	case signatureDSA:
+	case SignatureDSA:
 		pubKey, ok := cert.PublicKey.(*dsa.PublicKey)
 		if !ok {
 			return nil, errors.New("DSS ciphers require a DSA server public key")

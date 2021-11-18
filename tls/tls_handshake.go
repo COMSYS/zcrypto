@@ -6,10 +6,12 @@ package tls
 
 import (
 	"bytes"
+	"encoding/asn1"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/zmap/zcrypto/x509/pkix"
 	"strings"
 
 	jsonKeys "github.com/zmap/zcrypto/json"
@@ -132,18 +134,26 @@ type KeyMaterial struct {
 	PreMasterSecret *PreMasterSecret `json:"pre_master_secret,omitempty"`
 }
 
+type CertificateRequest struct {
+	CertificateTypes       []uint8      `json:"cert_types,omitempty"`
+	SupportedSigAlgos      []SigAndHash `json:"supported_sig_algos,omitempty"`
+	CertificateAuthorities []pkix.Name  `json:"CAs,omitempty"`
+	CADecodeErrors         []error      `json:"ca_decode_errors,omitempty"`
+}
+
 // ServerHandshake stores all of the messages sent by the server during a standard TLS Handshake.
 // It implements zgrab.EventData interface
 type ServerHandshake struct {
-	ClientHello        *ClientHello       `json:"client_hello,omitempty" zgrab:"debug"`
-	ServerHello        *ServerHello       `json:"server_hello,omitempty"`
-	ServerCertificates *Certificates      `json:"server_certificates,omitempty"`
-	ServerKeyExchange  *ServerKeyExchange `json:"server_key_exchange,omitempty"`
-	ClientKeyExchange  *ClientKeyExchange `json:"client_key_exchange,omitempty"`
-	ClientFinished     *Finished          `json:"client_finished,omitempty"`
-	SessionTicket      *SessionTicket     `json:"session_ticket,omitempty"`
-	ServerFinished     *Finished          `json:"server_finished,omitempty"`
-	KeyMaterial        *KeyMaterial       `json:"key_material,omitempty"`
+	ClientHello        *ClientHello        `json:"client_hello,omitempty" zgrab:"debug"`
+	ServerHello        *ServerHello        `json:"server_hello,omitempty"`
+	ServerCertificates *Certificates       `json:"server_certificates,omitempty"`
+	ServerKeyExchange  *ServerKeyExchange  `json:"server_key_exchange,omitempty"`
+	CertificateRequest *CertificateRequest `json:"certificate_request,omitempty"`
+	ClientKeyExchange  *ClientKeyExchange  `json:"client_key_exchange,omitempty"`
+	ClientFinished     *Finished           `json:"client_finished,omitempty"`
+	SessionTicket      *SessionTicket      `json:"session_ticket,omitempty"`
+	ServerFinished     *Finished           `json:"server_finished,omitempty"`
+	KeyMaterial        *KeyMaterial        `json:"key_material,omitempty"`
 }
 
 // MarshalJSON implements the json.Marshler interface
@@ -241,6 +251,63 @@ func (cm *CompressionMethod) UnmarshalJSON(b []byte) error {
 		return fmt.Errorf("mismatched compression method and name, compression method: %d, name: %s, expected name: %s", aux.Value, aux.Name, expectedName)
 	}
 	*cm = CompressionMethod(aux.Value)
+	return nil
+}
+
+type jsonCertificateRequest struct {
+	CertTypes              []string              `json:"cert_types,omitempty"`
+	SupportedSignatures    []auxSignatureAndHash `json:"supported_signatures,omitempty"`
+	CertificateAuthorities []pkix.Name           `json:"ca,omitempty"`
+}
+
+func (cr *CertificateRequest) MarshalJSON() ([]byte, error) {
+	var aux jsonCertificateRequest
+	for _, t := range cr.CertificateTypes {
+		aux.CertTypes = append(aux.CertTypes, nameForCertType(t))
+	}
+	for _, s := range cr.SupportedSigAlgos {
+		aux.SupportedSignatures = append(aux.SupportedSignatures, auxSignatureAndHash{
+			SignatureAlgorithm: nameForSignature(s.Signature),
+			HashAlgorithm:      nameForHash(s.Hash),
+		})
+	}
+	aux.CertificateAuthorities = cr.CertificateAuthorities
+	return json.Marshal(aux)
+}
+
+func (cr *CertificateRequest) UnmarshalJSON(b []byte) error {
+	var aux jsonCertificateRequest
+	if err := json.Unmarshal(b, &aux); err != nil {
+		return err
+	}
+	cr.CertificateTypes = make([]uint8, 0, len(aux.CertTypes))
+	for _, t := range aux.CertTypes {
+		cr.CertificateTypes = append(cr.CertificateTypes, certTypeForName(t))
+	}
+
+	cr.SupportedSigAlgos = make([]SigAndHash, 0, len(aux.SupportedSignatures))
+	for _, t := range aux.SupportedSignatures {
+		cr.SupportedSigAlgos = append(cr.SupportedSigAlgos, SigAndHash{
+			Signature: signatureToName(t.SignatureAlgorithm),
+			Hash:      hashToName(t.HashAlgorithm),
+		})
+	}
+
+	cr.CertificateAuthorities = aux.CertificateAuthorities
+	return nil
+}
+
+func (c *SimpleCertificate) UnmarshalJSON(b []byte) error {
+	var aux x509.JSONCertificateWithRaw
+	if err := json.Unmarshal(b, &aux); err != nil {
+		return err
+	}
+	parsed, err := aux.ParseRaw()
+	if err != nil {
+		// parsing errors should not cause json unmarshal errors
+	} else {
+		c.Parsed = parsed
+	}
 	return nil
 }
 
@@ -384,6 +451,28 @@ func (m *certificateMsg) MakeLog() *Certificates {
 	return sc
 }
 
+func (m *certificateMsg) MakeLogParsed() *Certificates {
+	sc := new(Certificates)
+	if len(m.certificates) >= 1 {
+		cert := m.certificates[0]
+		sc.Certificate.Raw = make([]byte, len(cert))
+		parsedCert, _ := x509.ParseCertificate(cert)
+		sc.Certificate.Parsed = parsedCert
+		copy(sc.Certificate.Raw, cert)
+	}
+	if len(m.certificates) >= 2 {
+		chain := m.certificates[1:]
+		sc.Chain = make([]SimpleCertificate, len(chain))
+		for idx, cert := range chain {
+			sc.Chain[idx].Raw = make([]byte, len(cert))
+			copy(sc.Chain[idx].Raw, cert)
+			parsedCert, _ := x509.ParseCertificate(cert)
+			sc.Chain[idx].Parsed = parsedCert
+		}
+	}
+	return sc
+}
+
 // addParsed sets the parsed certificates and the validation. It assumes the
 // chain slice has already been allocated.
 func (c *Certificates) addParsed(certs []*x509.Certificate, validation *x509.Validation) {
@@ -439,6 +528,24 @@ func (m *serverKeyExchangeMsg) MakeLog(ka keyAgreement) *ServerKeyExchange {
 	}
 
 	return skx
+}
+
+func (m *certificateRequestMsg) MakeLog() *CertificateRequest {
+	req := new(CertificateRequest)
+	req.CertificateTypes = m.certificateTypes
+	req.SupportedSigAlgos = m.signatureAndHashes
+	for _, raw := range m.certificateAuthorities {
+		ca := new(pkix.RDNSequence)
+		dn := new(pkix.Name)
+		_, err := asn1.Unmarshal(raw, ca)
+		if err != nil {
+			req.CADecodeErrors = append(req.CADecodeErrors, err)
+			continue
+		}
+		dn.FillFromRDNSequence(ca)
+		req.CertificateAuthorities = append(req.CertificateAuthorities, *dn)
+	}
+	return req
 }
 
 func (m *finishedMsg) MakeLog() *Finished {

@@ -6,40 +6,40 @@ package tls
 
 import "strconv"
 
-type alert uint8
+type Alert uint8
 
 const (
-	// alert level
+	// Alert level
 	alertLevelWarning = 1
 	alertLevelError   = 2
 )
 
 const (
-	alertCloseNotify            alert = 0
-	alertUnexpectedMessage      alert = 10
-	alertBadRecordMAC           alert = 20
-	alertDecryptionFailed       alert = 21
-	alertRecordOverflow         alert = 22
-	alertDecompressionFailure   alert = 30
-	alertHandshakeFailure       alert = 40
-	alertBadCertificate         alert = 42
-	alertUnsupportedCertificate alert = 43
-	alertCertificateRevoked     alert = 44
-	alertCertificateExpired     alert = 45
-	alertCertificateUnknown     alert = 46
-	alertIllegalParameter       alert = 47
-	alertUnknownCA              alert = 48
-	alertAccessDenied           alert = 49
-	alertDecodeError            alert = 50
-	alertDecryptError           alert = 51
-	alertProtocolVersion        alert = 70
-	alertInsufficientSecurity   alert = 71
-	alertInternalError          alert = 80
-	alertUserCanceled           alert = 90
-	alertNoRenegotiation        alert = 100
+	alertCloseNotify            Alert = 0
+	alertUnexpectedMessage      Alert = 10
+	alertBadRecordMAC           Alert = 20
+	alertDecryptionFailed       Alert = 21
+	alertRecordOverflow         Alert = 22
+	alertDecompressionFailure   Alert = 30
+	alertHandshakeFailure       Alert = 40
+	alertBadCertificate         Alert = 42
+	alertUnsupportedCertificate Alert = 43
+	alertCertificateRevoked     Alert = 44
+	alertCertificateExpired     Alert = 45
+	alertCertificateUnknown     Alert = 46
+	alertIllegalParameter       Alert = 47
+	alertUnknownCA              Alert = 48
+	alertAccessDenied           Alert = 49
+	alertDecodeError            Alert = 50
+	alertDecryptError           Alert = 51
+	alertProtocolVersion        Alert = 70
+	alertInsufficientSecurity   Alert = 71
+	alertInternalError          Alert = 80
+	alertUserCanceled           Alert = 90
+	alertNoRenegotiation        Alert = 100
 )
 
-var alertText = map[alert]string{
+var alertText = map[Alert]string{
 	alertCloseNotify:            "close notify",
 	alertUnexpectedMessage:      "unexpected message",
 	alertBadRecordMAC:           "bad record MAC",
@@ -64,7 +64,7 @@ var alertText = map[alert]string{
 	alertNoRenegotiation:        "no renegotiation",
 }
 
-func (e alert) String() string {
+func (e Alert) String() string {
 	s, ok := alertText[e]
 	if ok {
 		return s
@@ -72,6 +72,6 @@ func (e alert) String() string {
 	return "alert(" + strconv.Itoa(int(e)) + ")"
 }
 
-func (e alert) Error() string {
+func (e Alert) Error() string {
 	return e.String()
 }

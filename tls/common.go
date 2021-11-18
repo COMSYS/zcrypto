@@ -189,34 +189,39 @@ const (
 
 // Certificate types (for certificateRequestMsg)
 const (
-	certTypeRSASign    = 1 // A certificate containing an RSA key
-	certTypeDSSSign    = 2 // A certificate containing a DSA key
-	certTypeRSAFixedDH = 3 // A certificate containing a static DH key
-	certTypeDSSFixedDH = 4 // A certificate containing a static DH key
+	CertTypeRSASign    = 1 // A certificate containing an RSA key
+	CertTypeDSSSign    = 2 // A certificate containing a DSA key
+	CertTypeRSAFixedDH = 3 // A certificate containing a static DH key
+	CertTypeDSSFixedDH = 4 // A certificate containing a static DH key
 
 	// See RFC4492 sections 3 and 5.5.
-	certTypeECDSASign      = 64 // A certificate containing an ECDSA-capable public key, signed with ECDSA.
-	certTypeRSAFixedECDH   = 65 // A certificate containing an ECDH-capable public key, signed with RSA.
-	certTypeECDSAFixedECDH = 66 // A certificate containing an ECDH-capable public key, signed with ECDSA.
+	CertTypeECDSASign      = 64 // A certificate containing an ECDSA-capable public key, signed with ECDSA.
+	CertTypeRSAFixedECDH   = 65 // A certificate containing an ECDH-capable public key, signed with RSA.
+	CertTypeECDSAFixedECDH = 66 // A certificate containing an ECDH-capable public key, signed with ECDSA.
 
 	// Rest of these are reserved by the TLS spec
 )
 
 // Hash functions for TLS 1.2 (See RFC 5246, section A.4.1)
 const (
-	hashMD5    uint8 = 1
-	hashSHA1   uint8 = 2
-	hashSHA224 uint8 = 3
-	hashSHA256 uint8 = 4
-	hashSHA384 uint8 = 5
-	hashSHA512 uint8 = 6
+	HashNone      uint8 = 0
+	HashMD5       uint8 = 1
+	HashSHA1      uint8 = 2
+	HashSHA224    uint8 = 3
+	HashSHA256    uint8 = 4
+	HashSHA384    uint8 = 5
+	HashSHA512    uint8 = 6
+	HashIntrinsic uint8 = 8
 )
 
 // Signature algorithms for TLS 1.2 (See RFC 5246, section A.4.1)
 const (
-	signatureRSA   uint8 = 1
-	signatureDSA   uint8 = 2
-	signatureECDSA uint8 = 3
+	SignatureAnonymous uint8 = 0
+	SignatureRSA       uint8 = 1
+	SignatureDSA       uint8 = 2
+	SignatureECDSA     uint8 = 3
+	SignatureED25519   uint8 = 7
+	SignatureED448     uint8 = 8
 )
 
 // SigAndHash mirrors the TLS 1.2, SignatureAndHashAlgorithm struct. See
@@ -228,39 +233,39 @@ type SigAndHash struct {
 // supportedSKXSignatureAlgorithms contains the signature and hash algorithms
 // that the code advertises as supported in a TLS 1.2 ClientHello.
 var supportedSKXSignatureAlgorithms = []SigAndHash{
-	{signatureRSA, hashSHA512},
-	{signatureECDSA, hashSHA512},
-	{signatureDSA, hashSHA512},
-	{signatureRSA, hashSHA384},
-	{signatureECDSA, hashSHA384},
-	{signatureDSA, hashSHA384},
-	{signatureRSA, hashSHA256},
-	{signatureECDSA, hashSHA256},
-	{signatureDSA, hashSHA256},
-	{signatureRSA, hashSHA224},
-	{signatureECDSA, hashSHA224},
-	{signatureDSA, hashSHA224},
-	{signatureRSA, hashSHA1},
-	{signatureECDSA, hashSHA1},
-	{signatureDSA, hashSHA1},
-	{signatureRSA, hashMD5},
-	{signatureECDSA, hashMD5},
-	{signatureDSA, hashMD5},
+	{SignatureRSA, HashSHA512},
+	{SignatureECDSA, HashSHA512},
+	{SignatureDSA, HashSHA512},
+	{SignatureRSA, HashSHA384},
+	{SignatureECDSA, HashSHA384},
+	{SignatureDSA, HashSHA384},
+	{SignatureRSA, HashSHA256},
+	{SignatureECDSA, HashSHA256},
+	{SignatureDSA, HashSHA256},
+	{SignatureRSA, HashSHA224},
+	{SignatureECDSA, HashSHA224},
+	{SignatureDSA, HashSHA224},
+	{SignatureRSA, HashSHA1},
+	{SignatureECDSA, HashSHA1},
+	{SignatureDSA, HashSHA1},
+	{SignatureRSA, HashMD5},
+	{SignatureECDSA, HashMD5},
+	{SignatureDSA, HashMD5},
 }
 
 var defaultSKXSignatureAlgorithms = []SigAndHash{
-	{signatureRSA, hashSHA256},
-	{signatureECDSA, hashSHA256},
-	{signatureRSA, hashSHA1},
-	{signatureECDSA, hashSHA1},
+	{SignatureRSA, HashSHA256},
+	{SignatureECDSA, HashSHA256},
+	{SignatureRSA, HashSHA1},
+	{SignatureECDSA, HashSHA1},
 }
 
 // supportedClientCertSignatureAlgorithms contains the signature and hash
 // algorithms that the code advertises as supported in a TLS 1.2
 // CertificateRequest.
 var supportedClientCertSignatureAlgorithms = []SigAndHash{
-	{signatureRSA, hashSHA256},
-	{signatureECDSA, hashSHA256},
+	{SignatureRSA, HashSHA256},
+	{SignatureECDSA, HashSHA256},
 }
 
 // ConnectionState records basic TLS details about the connection.
@@ -514,6 +519,10 @@ type Config struct {
 	// this Config is returned by a GetConfigForClient callback. It's used
 	// by serverInit in order to copy session ticket keys if needed.
 	originalConfig *Config
+
+	// Use the first client certificate, even if it does not match the
+	// requested DN given by the server
+	IgnoreClientCaName bool
 }
 
 // ticketKeyNameLen is the number of bytes of identifier that is prepended to

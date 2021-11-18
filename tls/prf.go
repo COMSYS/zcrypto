@@ -279,17 +279,17 @@ func exportKeysFromMasterSecret(version uint16, suite *cipherSuite, masterSecret
 // TLS hash identifier.
 func lookupTLSHash(hash uint8) (crypto.Hash, error) {
 	switch hash {
-	case hashMD5:
+	case HashMD5:
 		return crypto.MD5, nil
-	case hashSHA1:
+	case HashSHA1:
 		return crypto.SHA1, nil
-	case hashSHA224:
+	case HashSHA224:
 		return crypto.SHA224, nil
-	case hashSHA256:
+	case HashSHA256:
 		return crypto.SHA256, nil
-	case hashSHA384:
+	case HashSHA384:
 		return crypto.SHA384, nil
-	case hashSHA512:
+	case HashSHA512:
 		return crypto.SHA512, nil
 	default:
 		return 0, errors.New("tls: unsupported hash algorithm")
@@ -431,7 +431,7 @@ func (h finishedHash) selectClientCertSignatureAlgorithm(serverList, clientList 
 // id suitable for signing by a TLS client certificate.
 func (h finishedHash) hashForClientCertificate(signatureAndHash SigAndHash, masterSecret []byte) ([]byte, crypto.Hash, error) {
 	if h.version == VersionSSL30 {
-		if signatureAndHash.Signature != signatureRSA {
+		if signatureAndHash.Signature != SignatureRSA {
 			return nil, 0, errors.New("tls: unsupported signature type for client certificate")
 		}
 
@@ -450,7 +450,7 @@ func (h finishedHash) hashForClientCertificate(signatureAndHash SigAndHash, mast
 		hash.Write(h.buffer)
 		return hash.Sum(nil), hashAlg, nil
 	}
-	if signatureAndHash.Signature == signatureECDSA {
+	if signatureAndHash.Signature == SignatureECDSA {
 		return h.server.Sum(nil), crypto.SHA1, nil
 	}
 

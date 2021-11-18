@@ -17,24 +17,30 @@ var curveNames map[uint16]string
 var pointFormatNames map[uint8]string
 var clientAuthTypeNames map[int]string
 var signatureSchemeNames map[uint16]string
+var clientCertTypes map[uint8]string
 
 func init() {
 	// RFC 5246 7.4.1.4.1
 	signatureNames = make(map[uint8]string, 8)
 	// TODO FIXME: the RFC also defines anonymous(0) and (255).
-	signatureNames[signatureRSA] = "rsa"
-	signatureNames[signatureDSA] = "dsa"
-	signatureNames[signatureECDSA] = "ecdsa"
+	signatureNames[SignatureAnonymous] = "anonymous"
+	signatureNames[SignatureRSA] = "rsa"
+	signatureNames[SignatureDSA] = "dsa"
+	signatureNames[SignatureECDSA] = "ecdsa"
+	signatureNames[SignatureED25519] = "edd25519"
+	signatureNames[SignatureED448] = "ed448"
 
 	// RFC 5246 7.4.1.4.1
 	hashNames = make(map[uint8]string, 16)
 	// TODO FIXME: the RFC also defines none(0) and (255).
-	hashNames[hashMD5] = "md5"
-	hashNames[hashSHA1] = "sha1"
-	hashNames[hashSHA224] = "sha224"
-	hashNames[hashSHA256] = "sha256"
-	hashNames[hashSHA384] = "sha384"
-	hashNames[hashSHA512] = "sha512"
+	hashNames[HashNone] = "none"
+	hashNames[HashMD5] = "md5"
+	hashNames[HashSHA1] = "sha1"
+	hashNames[HashSHA224] = "sha224"
+	hashNames[HashSHA256] = "sha256"
+	hashNames[HashSHA384] = "sha384"
+	hashNames[HashSHA512] = "sha512"
+	hashNames[HashIntrinsic] = "intrinsic"
 
 	cipherSuiteNames = make(map[int]string, 512)
 	cipherSuiteNames[0x0000] = "TLS_NULL_WITH_NULL_NULL"
@@ -375,6 +381,10 @@ func init() {
 	cipherSuiteNames[0xC0AD] = "TLS_ECDHE_ECDSA_WITH_AES_256_CCM"
 	cipherSuiteNames[0xC0AE] = "TLS_ECDHE_ECDSA_WITH_AES_128_CCM_8"
 	cipherSuiteNames[0xC0AF] = "TLS_ECDHE_ECDSA_WITH_AES_256_CCM_8"
+	cipherSuiteNames[0xC0B0] = "TLS_ECCPWD_WITH_AES_128_GCM_SHA256"
+	cipherSuiteNames[0xC0B1] = "TLS_ECCPWD_WITH_AES_256_GCM_SHA384"
+	cipherSuiteNames[0xC0B2] = "TLS_ECCPWD_WITH_AES_128_CCM_SHA256"
+	cipherSuiteNames[0xC0B3] = "TLS_ECCPWD_WITH_AES_256_CCM_SHA384"
 	cipherSuiteNames[0xCAFE] = "TLS_ECDHE_PSK_WITH_AES_128_GCM_SHA256"
 	cipherSuiteNames[0xCC13] = "TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256_OLD"
 	cipherSuiteNames[0xCC14] = "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256_OLD"
@@ -467,6 +477,18 @@ func init() {
 	signatureSchemeNames[uint16(ECDSAWithP521AndSHA512)] = "ecdsa_secp521r1_sha512"
 	signatureSchemeNames[uint16(EdDSAWithEd25519)] = "ed25519"
 	signatureSchemeNames[uint16(EdDSAWithEd448)] = "ed448"
+
+	clientCertTypes = make(map[uint8]string, 7)
+	// https://tools.ietf.org/html/rfc5246#section-7.4.4
+	clientCertTypes[CertTypeRSASign] = "rsa_sign"
+	clientCertTypes[CertTypeDSSSign] = "dss_sign"
+	clientCertTypes[CertTypeRSAFixedDH] = "rsa_fixed_dh"
+	clientCertTypes[CertTypeDSSFixedDH] = "dss_fixed_dh"
+
+	// https://tools.ietf.org/html/rfc4492#section-5.5
+	clientCertTypes[CertTypeECDSASign] = "ecdsa_sign"
+	clientCertTypes[CertTypeRSAFixedECDH] = "rsa_fixed_ecdh"
+	clientCertTypes[CertTypeECDSAFixedECDH] = "ecdsa_fixed_ecdh"
 }
 
 func nameForSignature(s uint8) string {
@@ -482,6 +504,23 @@ func nameForHash(h uint8) string {
 	}
 	num := strconv.Itoa(int(h))
 	return "unknown." + num
+}
+
+func nameForCertType(t uint8) string {
+	if name, ok := clientCertTypes[t]; ok {
+		return name
+	}
+	return "unknown+" + strconv.Itoa(int(t))
+}
+
+func certTypeForName(n string) uint8 {
+	for k, v := range clientCertTypes {
+		if v == n {
+			return k
+		}
+	}
+	h, _ := strconv.ParseInt(strings.TrimPrefix(n, "unknown"), 10, 32)
+	return uint8(h)
 }
 
 func signatureToName(n string) uint8 {
@@ -507,6 +546,10 @@ func hashToName(n string) uint8 {
 func nameForSuite(cs uint16) string {
 	cipher := CipherSuite(cs)
 	return cipher.String()
+}
+
+func NameForSuite(cs uint16) string {
+	return nameForSuite(cs)
 }
 
 func (cs CipherSuite) Bytes() []byte {

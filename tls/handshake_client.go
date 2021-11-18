@@ -713,6 +713,8 @@ func (hs *clientHandshakeState) doFullHandshake() error {
 	if ok {
 		certRequested = true
 
+		c.handshakeLog.CertificateRequest = certReq.MakeLog()
+
 		// RFC 4346 on the certificateAuthorities field:
 		// A list of the distinguished names of acceptable certificate
 		// authorities. These distinguished names may specify a desired
@@ -729,9 +731,9 @@ func (hs *clientHandshakeState) doFullHandshake() error {
 		var rsaAvail, ecdsaAvail bool
 		for _, certType := range certReq.certificateTypes {
 			switch certType {
-			case certTypeRSASign:
+			case CertTypeRSASign:
 				rsaAvail = true
-			case certTypeECDSASign:
+			case CertTypeECDSASign:
 				ecdsaAvail = true
 			}
 		}
@@ -763,7 +765,7 @@ func (hs *clientHandshakeState) doFullHandshake() error {
 					continue findCert
 				}
 
-				if len(certReq.certificateAuthorities) == 0 {
+				if len(certReq.certificateAuthorities) == 0 || c.config.IgnoreClientCaName {
 					// they gave us an empty list, so just take the
 					// first RSA cert from c.config.Certificates
 					chainToSend = &chain
@@ -827,9 +829,9 @@ func (hs *clientHandshakeState) doFullHandshake() error {
 		var signatureType uint8
 		switch c.config.Certificates[0].PrivateKey.(type) {
 		case *ecdsa.PrivateKey:
-			signatureType = signatureECDSA
+			signatureType = SignatureECDSA
 		case *rsa.PrivateKey:
-			signatureType = signatureRSA
+			signatureType = SignatureRSA
 		default:
 			c.sendAlert(alertInternalError)
 			return errors.New("unknown private key type")
